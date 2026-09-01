@@ -1,313 +1,81 @@
-// =====================================================
-// 温森神社 YouTube プレイヤー 安定版
-//
-// ・起動時は外部通信しません
-// ・「再生」を押した時だけHTMLへ接続します
-// ・HTML上の「▶ 再生する」を押した時にYouTubeへ接続します
-// ・「停止」でMedia on a Prim自体を削除し、再接続を防ぎます
-// ・固定動画: https://www.youtube.com/watch?v=psOfZ9NHwgs
-// =====================================================
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 
-integer FACE = 0;
+<title>温森神社 YouTube Player</title>
 
-// FALSE = 所有者のみ操作
-// TRUE  = 参拝者全員操作
-integer PUBLIC_MODE = FALSE;
-
-// ★ GitHub Pagesなどに公開したHTMLのURLへ変更してください
-string PLAYER_URL = "https://YOUR-DOMAIN.example/";
-
-integer CHANNEL;
-integer LISTEN_HANDLE;
-
-
-// -----------------------------------------------------
-// 権限
-// -----------------------------------------------------
-
-integer mediaPerms()
-{
-    if (PUBLIC_MODE)
-    {
-        return PRIM_MEDIA_PERM_OWNER |
-               PRIM_MEDIA_PERM_GROUP |
-               PRIM_MEDIA_PERM_ANYONE;
-    }
-
-    return PRIM_MEDIA_PERM_OWNER;
+<style>
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: black;
 }
 
-integer canControl(key avatar)
-{
-    if (avatar == llGetOwner())
-    {
-        return TRUE;
-    }
-
-    if (PUBLIC_MODE)
-    {
-        return TRUE;
-    }
-
-    return FALSE;
+#start {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: black;
 }
 
-
-// -----------------------------------------------------
-// 再生
-// -----------------------------------------------------
-
-playVideo()
-{
-    integer perms = mediaPerms();
-
-    // 念のため既存メディアを完全削除
-    llClearPrimMedia(FACE);
-
-    llSleep(0.2);
-
-    // この操作をした時だけ外部URLへ接続
-    integer result = llSetPrimMediaParams(
-        FACE,
-        [
-            PRIM_MEDIA_HOME_URL, PLAYER_URL,
-            PRIM_MEDIA_CURRENT_URL, PLAYER_URL,
-
-            // Viewer起動時の自動再生は禁止
-            PRIM_MEDIA_AUTO_PLAY, FALSE,
-
-            PRIM_MEDIA_AUTO_SCALE, TRUE,
-            PRIM_MEDIA_FIRST_CLICK_INTERACT, TRUE,
-
-            PRIM_MEDIA_CONTROLS, PRIM_MEDIA_CONTROLS_MINI,
-
-            PRIM_MEDIA_WIDTH_PIXELS, 1280,
-            PRIM_MEDIA_HEIGHT_PIXELS, 720,
-
-            PRIM_MEDIA_PERMS_INTERACT, perms,
-            PRIM_MEDIA_PERMS_CONTROL, perms
-        ]
-    );
-
-    if (result == 0)
-    {
-        llOwnerSay(
-            "HTMLプレイヤーを読み込みました。"
-            + "\n画面内の「▶ 再生する」を押してください。"
-        );
-    }
-    else
-    {
-        llOwnerSay(
-            "Media設定エラー: " + (string)result
-        );
-    }
+#playButton {
+    font-size: 42px;
+    padding: 24px 48px;
+    cursor: pointer;
 }
 
-
-// -----------------------------------------------------
-// 停止
-// -----------------------------------------------------
-
-stopVideo()
-{
-    integer result = llClearPrimMedia(FACE);
-
-    if (result == 0)
-    {
-        llOwnerSay(
-            "動画を停止し、メディア接続を解除しました。"
-        );
-    }
-    else
-    {
-        llOwnerSay(
-            "Media解除エラー: " + (string)result
-        );
-    }
+#player {
+    position: fixed;
+    inset: 0;
+    display: none;
 }
 
-
-// -----------------------------------------------------
-// 再読み込み
-// -----------------------------------------------------
-
-reloadVideo()
-{
-    stopVideo();
-    llSleep(0.3);
-    playVideo();
+#player iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
 }
+</style>
+</head>
 
+<body>
 
-// -----------------------------------------------------
-// メニュー
-// -----------------------------------------------------
+<div id="start">
+    <button id="playButton">▶ 再生する</button>
+</div>
 
-showOwnerDialog(key avatar)
+<div id="player"></div>
+
+<script>
+document.getElementById("playButton").onclick = function()
 {
-    string mode;
+    var iframe = document.createElement("iframe");
 
-    if (PUBLIC_MODE)
-    {
-        mode = "参拝者全員操作";
-    }
-    else
-    {
-        mode = "所有者のみ操作";
-    }
+    iframe.src =
+        "https://www.youtube.com/embed/psOfZ9NHwgs?autoplay=1&controls=1&rel=0&playsinline=1";
 
-    llDialog(
-        avatar,
-        "温森神社 YouTube\n現在: " + mode,
-        ["再生", "停止", "再読込", "所有者のみ", "全員操作"],
-        CHANNEL
-    );
-}
+    iframe.allow =
+        "autoplay; encrypted-media; picture-in-picture; fullscreen";
 
-showVisitorDialog(key avatar)
-{
-    llDialog(
-        avatar,
-        "温森神社 YouTube",
-        ["再生", "停止", "再読込"],
-        CHANNEL
-    );
-}
+    iframe.referrerPolicy =
+        "strict-origin-when-cross-origin";
 
+    iframe.allowFullscreen = true;
 
-// =====================================================
-// メイン
-// =====================================================
+    document.getElementById("player").appendChild(iframe);
 
-default
-{
-    state_entry()
-    {
-        CHANNEL = -100000 - (integer)llFrand(900000.0);
+    document.getElementById("start").style.display = "none";
+    document.getElementById("player").style.display = "block";
+};
+</script>
 
-        if (LISTEN_HANDLE)
-        {
-            llListenRemove(LISTEN_HANDLE);
-        }
-
-        LISTEN_HANDLE = llListen(
-            CHANNEL,
-            "",
-            NULL_KEY,
-            ""
-        );
-
-        // 起動時はMediaを完全に削除
-        // 外部サイトへの通信は発生しません
-        llClearPrimMedia(FACE);
-
-        llOwnerSay(
-            "温森神社 YouTubeプレイヤーを起動しました。"
-            + "\n初期状態では外部通信しません。"
-            + "\n表示面 FACE = " + (string)FACE
-        );
-    }
-
-
-    touch_start(integer total_number)
-    {
-        key avatar = llDetectedKey(0);
-
-        if (avatar == llGetOwner())
-        {
-            showOwnerDialog(avatar);
-            return;
-        }
-
-        if (PUBLIC_MODE)
-        {
-            showVisitorDialog(avatar);
-            return;
-        }
-
-        llRegionSayTo(
-            avatar,
-            0,
-            "現在は所有者のみ操作できます。"
-        );
-    }
-
-
-    listen(
-        integer channel,
-        string name,
-        key id,
-        string message
-    )
-    {
-        if (channel != CHANNEL)
-        {
-            return;
-        }
-
-        if (message == "再生")
-        {
-            if (canControl(id))
-            {
-                playVideo();
-            }
-            return;
-        }
-
-        if (message == "停止")
-        {
-            if (canControl(id))
-            {
-                stopVideo();
-            }
-            return;
-        }
-
-        if (message == "再読込")
-        {
-            if (canControl(id))
-            {
-                reloadVideo();
-            }
-            return;
-        }
-
-        // 以下は所有者のみ
-        if (id != llGetOwner())
-        {
-            return;
-        }
-
-        if (message == "所有者のみ")
-        {
-            PUBLIC_MODE = FALSE;
-
-            llOwnerSay(
-                "操作モードを「所有者のみ」に変更しました。"
-            );
-
-            return;
-        }
-
-        if (message == "全員操作")
-        {
-            PUBLIC_MODE = TRUE;
-
-            llOwnerSay(
-                "操作モードを「参拝者全員」に変更しました。"
-            );
-
-            return;
-        }
-    }
-
-
-    changed(integer change)
-    {
-        if (change & CHANGED_OWNER)
-        {
-            llResetScript();
-        }
-    }
-}
+</body>
+</html>
